@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        os_version: [bullseye, bookworm]
+        os_version: [bookworm]
         python_version: [3.11, 3.12]
       fail-fast: false
 
@@ -70,7 +70,7 @@ jobs:
         IMAGE_NAME=ringcentral/denali-base
         GH_DOCKER_PKG_IMAGE_NAME=ghcr.io/ringcentral-docker/denali/denali-base
 
-        NEW_ENTRY="| Python ${matrix.python_version} | ${matrix.os_version} | ${VERSION} | \`${IMAGE_NAME}:${VERSION}\` | \`${GH_DOCKER_PKG_IMAGE_NAME}:${VERSION}\` |"
+        NEW_ENTRY="| Python ${{ matrix.python_version }} | ${{ matrix.os_version }} | ${VERSION} | \`${IMAGE_NAME}:${VERSION}\` | \`${GH_DOCKER_PKG_IMAGE_NAME}:${VERSION}\` |"
         echo "${NEW_ENTRY}" > readme_updates_${VERSION}.txt
 
     - name: Upload README Update
