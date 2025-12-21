@@ -1,0 +1,272 @@
+name: Build Denali Images
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'base/**'
+      - 'packages/**'
+      - 'versions/**'
+      - '.github/workflows/build.yml'
+  pull_request:
+    paths:
+      - 'base/**'
+      - 'packages/**'
+      - 'versions/**'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Specific version to build (e.g., 3.12-bookworm), or "all" for all versions'
+        required: false
+        default: 'all'
+
+env:
+  DOCKER_HUB_IMAGE_BASE: ringcentral/denali-base
+  DOCKER_HUB_IMAGE_PACKAGES: ringcentral/denali-packages
+  GHCR_IMAGE_BASE: ghcr.io/ringcentral-docker/denali-base
+  GHCR_IMAGE_PACKAGES: ghcr.io/ringcentral-docker/denali-packages
+
+jobs:
+  # =============================================================================
+  # Generate build matrix from versions.json
+  # =============================================================================
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate build matrix
+        id: set-matrix
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.version }}" != "all" ]]; then
+            MATRIX=$(jq -c --arg v "${{ github.event.inputs.version }}" \
+              '{include: [.versions[] | select(.name == $v)]}' versions/versions.json)
+          else
+            MATRIX=$(jq -c '{include: .versions}' versions/versions.json)
+          fi
+          echo "matrix=${MATRIX}" >> $GITHUB_OUTPUT
+
+  # =============================================================================
+  # Build base images
+  # =============================================================================
+  build-base:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+
+      - name: Login to GitHub Container Registry
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Docker tags
+        id: meta
+        run: |
+          NAME="${{ matrix.name }}"
+          IS_LATEST="${{ matrix.is_latest }}"
+
+          TAGS=""
+          for REGISTRY in "${{ env.DOCKER_HUB_IMAGE_BASE }}" "${{ env.GHCR_IMAGE_BASE }}"; do
+            TAGS="${TAGS}${REGISTRY}:${NAME},"
+            if [[ "${IS_LATEST}" == "true" ]]; then
+              TAGS="${TAGS}${REGISTRY}:latest,"
+            fi
+          done
+
+          echo "tags=${TAGS%,}" >> $GITHUB_OUTPUT
+
+      - name: Build and push base image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./base/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            BASE_IMAGE_TAG=${{ matrix.base_image_tag }}
+          cache-from: type=gha,scope=base-${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=base-${{ matrix.name }}
+
+  # =============================================================================
+  # Build packages images
+  # =============================================================================
+  build-packages:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+
+      - name: Login to GitHub Container Registry
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Docker tags
+        id: meta
+        run: |
+          NAME="${{ matrix.name }}"
+          IS_LATEST="${{ matrix.is_latest }}"
+
+          TAGS=""
+          for REGISTRY in "${{ env.DOCKER_HUB_IMAGE_PACKAGES }}" "${{ env.GHCR_IMAGE_PACKAGES }}"; do
+            TAGS="${TAGS}${REGISTRY}:${NAME},"
+            if [[ "${IS_LATEST}" == "true" ]]; then
+              TAGS="${TAGS}${REGISTRY}:latest,"
+            fi
+          done
+
+          echo "tags=${TAGS%,}" >> $GITHUB_OUTPUT
+
+      - name: Build and push packages image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./packages/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            BASE_IMAGE_TAG=${{ matrix.base_image_tag }}
+            POETRY_VERSION=${{ matrix.poetry_version }}
+          cache-from: type=gha,scope=packages-${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=packages-${{ matrix.name }}
+
+  # =============================================================================
+  # Update README
+  # =============================================================================
+  update-readme:
+    needs: [build-base, build-packages]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate README from versions.json
+        run: |
+          cat > README.md << 'HEADER'
+          # Denali Docker Images
+
+          Multi-platform Python Docker images for Denali projects.
+
+          ## Supported Platforms
+
+          - linux/amd64
+          - linux/arm64
+
+          ## Base Images (denali-base)
+
+          | Python | OS | Docker Hub | GitHub Package |
+          |--------|-------|------------|----------------|
+          HEADER
+
+          # Generate base image rows
+          jq -r --arg hub "${{ env.DOCKER_HUB_IMAGE_BASE }}" \
+                --arg ghcr "${{ env.GHCR_IMAGE_BASE }}" \
+            '.versions[] |
+              "| \(.python_version) | \(.os_version) | `\($hub):\(.name)` | `\($ghcr):\(.name)` |"
+            ' versions/versions.json >> README.md
+
+          cat >> README.md << 'MIDDLE'
+
+          ## Packages Images (denali-packages)
+
+          | Python | OS | Poetry | Docker Hub | GitHub Package |
+          |--------|-------|--------|------------|----------------|
+          MIDDLE
+
+          # Generate packages image rows
+          jq -r --arg hub "${{ env.DOCKER_HUB_IMAGE_PACKAGES }}" \
+                --arg ghcr "${{ env.GHCR_IMAGE_PACKAGES }}" \
+            '.versions[] |
+              "| \(.python_version) | \(.os_version) | \(.poetry_version) | `\($hub):\(.name)` | `\($ghcr):\(.name)` |"
+            ' versions/versions.json >> README.md
+
+          cat >> README.md << 'FOOTER'
+
+          ## Usage
+
+          ```bash
+          # Pull base image
+          docker pull ringcentral/denali-base:3.11-bookworm
+
+          # Pull packages image (with Poetry)
+          docker pull ringcentral/denali-packages:3.11-bookworm
+          ```
+
+          ## Build Locally
+
+          ```bash
+          # Build base image
+          docker build --build-arg BASE_IMAGE_TAG=3.12-bookworm \
+            -f base/Dockerfile -t denali-base:3.12-bookworm .
+
+          # Build packages image
+          docker build --build-arg BASE_IMAGE_TAG=3.12-bookworm \
+            --build-arg POETRY_VERSION=2.0.1 \
+            -f packages/Dockerfile -t denali-packages:3.12-bookworm .
+          ```
+
+          ## License
+
+          MIT License
+          FOOTER
+
+      - name: Commit README
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add README.md
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "docs: update README with Docker image info"
+            git push
+          fi
