@@ -21,6 +21,7 @@ RUN apt-get update \
         # install libmagic to support the use of python-magic guess MIMETYPE
         libmagic1 \
     # Install libldap (package name varies by Debian version)
+    # TODO: Remove libldap-2.5-0 fallback when bookworm is deprecated, keep only libldap2
     && (apt-get install -y --no-install-recommends libldap-2.5-0 || \
         apt-get install -y --no-install-recommends libldap2 || \
         echo "libldap package not found, skipping") \
