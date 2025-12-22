@@ -11,18 +11,14 @@ Multi-platform Python Docker images for Denali projects.
 
 | Python | OS | Docker Hub | GitHub Package |
 |--------|-------|------------|----------------|
-| 3.13 | bookworm | `ringcentral/denali-base:3.13-bookworm` | `ghcr.io/ringcentral-docker/denali-base:3.13-bookworm` |
 | 3.13 | trixie | `ringcentral/denali-base:3.13-trixie` | `ghcr.io/ringcentral-docker/denali-base:3.13-trixie` |
-| 3.14 | bookworm | `ringcentral/denali-base:3.14-bookworm` | `ghcr.io/ringcentral-docker/denali-base:3.14-bookworm` |
 | 3.14 | trixie | `ringcentral/denali-base:3.14-trixie` | `ghcr.io/ringcentral-docker/denali-base:3.14-trixie` |
 
 ## Packages Images (denali-packages)
 
 | Python | OS | Poetry | Docker Hub | GitHub Package |
 |--------|-------|--------|------------|----------------|
-| 3.13 | bookworm | 2.2.1 | `ringcentral/denali-packages:3.13-bookworm` | `ghcr.io/ringcentral-docker/denali-packages:3.13-bookworm` |
 | 3.13 | trixie | 2.2.1 | `ringcentral/denali-packages:3.13-trixie` | `ghcr.io/ringcentral-docker/denali-packages:3.13-trixie` |
-| 3.14 | bookworm | 2.2.1 | `ringcentral/denali-packages:3.14-bookworm` | `ghcr.io/ringcentral-docker/denali-packages:3.14-bookworm` |
 | 3.14 | trixie | 2.2.1 | `ringcentral/denali-packages:3.14-trixie` | `ghcr.io/ringcentral-docker/denali-packages:3.14-trixie` |
 
 ## Usage
