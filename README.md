@@ -25,23 +25,23 @@ Multi-platform Python Docker images for Denali projects.
 
 ```bash
 # Pull base image
-docker pull ringcentral/denali-base:3.11-bookworm
+docker pull ringcentral/denali-base:3.14-trixie
 
 # Pull packages image (with Poetry)
-docker pull ringcentral/denali-packages:3.11-bookworm
+docker pull ringcentral/denali-packages:3.14-trixie
 ```
 
 ## Build Locally
 
 ```bash
 # Build base image
-docker build --build-arg BASE_IMAGE_TAG=3.12-bookworm \
-  -f base/Dockerfile -t denali-base:3.12-bookworm .
+docker build --build-arg BASE_IMAGE_TAG=3.14-trixie \
+  -f base/Dockerfile -t denali-base:3.14-trixie .
 
 # Build packages image
-docker build --build-arg BASE_IMAGE_TAG=3.12-bookworm \
+docker build --build-arg BASE_IMAGE_TAG=3.14-trixie \
   --build-arg POETRY_VERSION=2.0.1 \
-  -f packages/Dockerfile -t denali-packages:3.12-bookworm .
+  -f packages/Dockerfile -t denali-packages:3.14-trixie .
 ```
 
 ## License
