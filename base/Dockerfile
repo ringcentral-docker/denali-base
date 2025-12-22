@@ -1,9 +1,9 @@
 # Parameterized Denali Base Dockerfile
 #
 # Build example:
-#   docker build --build-arg BASE_IMAGE_TAG=3.12-bookworm -t ringcentral/denali-base:3.12-bookworm .
+#   docker build --build-arg BASE_IMAGE_TAG=3.14-trixie -t ringcentral/denali-base:3.14-trixie .
 
-ARG BASE_IMAGE_TAG=3.11-bookworm
+ARG BASE_IMAGE_TAG=3.14-trixie
 
 FROM public.ecr.aws/docker/library/python:${BASE_IMAGE_TAG}
 
@@ -20,11 +20,8 @@ RUN apt-get update \
         fonts-noto-cjk \
         # install libmagic to support the use of python-magic guess MIMETYPE
         libmagic1 \
-    # Install libldap (package name varies by Debian version)
-    # TODO: Remove libldap-2.5-0 fallback when bookworm is deprecated, keep only libldap2
-    && (apt-get install -y --no-install-recommends libldap-2.5-0 || \
-        apt-get install -y --no-install-recommends libldap2 || \
-        echo "libldap package not found, skipping") \
+        # Install libldap (package name varies by Debian version)
+        libldap2 \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 

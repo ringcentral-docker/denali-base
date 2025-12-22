@@ -2,11 +2,11 @@
 #
 # Build example:
 #   docker build \
-#     --build-arg BASE_IMAGE_TAG=3.12-bookworm \
+#     --build-arg BASE_IMAGE_TAG=3.14-trixie \
 #     --build-arg POETRY_VERSION=2.0.1 \
-#     -t ringcentral/denali-packages:3.12-bookworm .
+#     -t ringcentral/denali-packages:3.14-trixie .
 
-ARG BASE_IMAGE_TAG=3.11-bookworm
+ARG BASE_IMAGE_TAG=3.14-trixie
 
 FROM public.ecr.aws/docker/library/python:${BASE_IMAGE_TAG}
 
