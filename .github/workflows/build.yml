@@ -56,6 +56,9 @@ jobs:
   build-base:
     needs: prepare
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: write
     strategy:
       matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
       fail-fast: false
@@ -101,6 +104,7 @@ jobs:
           echo "tags=${TAGS%,}" >> $GITHUB_OUTPUT
 
       - name: Build and push base image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -113,12 +117,31 @@ jobs:
           cache-from: type=gha,scope=base-${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=base-${{ matrix.name }}
 
+      - name: Run Trivy vulnerability scanner
+        if: steps.build.outcome == 'success' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.DOCKER_HUB_IMAGE_BASE }}:${{ matrix.name }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v4
+        if: steps.build.outcome == 'success' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'denali-base-${{ matrix.name }}'
+
   # =============================================================================
   # Build packages images
   # =============================================================================
   build-packages:
     needs: prepare
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: write
     strategy:
       matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
       fail-fast: false
@@ -164,6 +187,7 @@ jobs:
           echo "tags=${TAGS%,}" >> $GITHUB_OUTPUT
 
       - name: Build and push packages image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -176,6 +200,22 @@ jobs:
             POETRY_VERSION=${{ matrix.poetry_version }}
           cache-from: type=gha,scope=packages-${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=packages-${{ matrix.name }}
+
+      - name: Run Trivy vulnerability scanner
+        if: steps.build.outcome == 'success' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.DOCKER_HUB_IMAGE_PACKAGES }}:${{ matrix.name }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v4
+        if: steps.build.outcome == 'success' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'denali-packages-${{ matrix.name }}'
 
   # =============================================================================
   # Update README
